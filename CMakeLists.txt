@@ -21,7 +21,12 @@ project(raconfig LANGUAGES CXX)
 find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(Boost COMPONENTS unit_test_framework)
 
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -Wextra -Werror")
+set(CXX_STD $ENV{CXX_STD})
+if (NOT CXX_STD)
+    set(CXX_STD "-std=c++11")
+endif()
+
+set(CMAKE_CXX_FLAGS "${CXX_STD} -Wall -Wextra -Werror")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 set(CMAKE_CXX_FLAGS_MINSIZEREL "-Os")
