@@ -1,0 +1,54 @@
+language: c++
+dist: trusty
+sudo: required
+
+git:
+  depth: 1
+
+matrix:
+  include:
+    - os: linux
+      addons:
+        apt:
+          packages:
+            - libboost-program-options-dev
+            - libboost-test-dev
+      env:
+        - CC_=gcc
+        - CXX_=g++
+        - CXX_STD=-std=c++11
+    - os: linux
+      addons:
+        apt:
+          packages:
+            - g++-5
+            - libboost-program-options-dev
+            - libboost-test-dev
+          sources:
+            - ubuntu-toolchain-r-test
+      env:
+        - CC_=gcc-5
+        - CXX_=g++-5
+        - CXX_STD=-std=c++14
+    - os: linux
+      addons:
+        apt:
+          packages:
+            - g++-6
+            - libboost-program-options-dev
+            - libboost-test-dev
+          sources:
+            - ubuntu-toolchain-r-test
+      env:
+        - CC_=gcc-6
+        - CXX_=g++-6
+        - CXX_STD=-std=c++1z
+
+install:
+  - export CC="$CC_"
+  - export CXX="$CXX_"
+
+script:
+  - mkdir -p build && cd build && rm -rf *
+  - cmake ..
+  - make VERBOSE=1 && ctest --verbose

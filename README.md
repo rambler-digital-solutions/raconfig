@@ -1,5 +1,7 @@
 # Declarative configuration wrapper on Boost.Program Options
 
+[![Build Status](https://travis-ci.org/rambler-digital-solutions/raconfig.svg?branch=master)](https://travis-ci.org/rambler-digital-solutions/raconfig)
+
 ## Motivation
 
 **Boost.Program Options** is a very good library for getting options from command line, text file or even process environment. But it also requires to write imperative code to setup parsers and very often to wrap all of that stuff into configuration singleton with trivial (or not) getters. Writing configuration for a new project often comes to a copying-pasting-modifying of code from a previous project.
