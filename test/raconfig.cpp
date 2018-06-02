@@ -97,9 +97,9 @@ using config = raconfig::config<actions,
     option::power2>;
 
 template<class T>
-struct basic_file_fixture
+struct file_fixture
 {
-    basic_file_fixture()
+    file_fixture()
     {
         std::remove("test.ini");
         std::ofstream file;
@@ -145,7 +145,7 @@ BOOST_AUTO_TEST_CASE(test_cmd_line)
     BOOST_CHECK_EQUAL(cfg.get<value_type>(), 456);
 }
 
-struct easy_file_fixture: basic_file_fixture<easy_file_fixture>
+struct easy_file_fixture: file_fixture<easy_file_fixture>
 {
     void write(std::ostream& file)
     {
@@ -390,7 +390,7 @@ BOOST_AUTO_TEST_CASE(test_cmd_line)
     BOOST_CHECK((cfg.get<option::power2>() == std::vector<unsigned>{8, 32}));
 }
 
-struct cfg_file_fixture: basic_file_fixture<cfg_file_fixture>
+struct cfg_file_fixture: file_fixture<cfg_file_fixture>
 {
     void write(std::ostream& file)
     {
@@ -443,7 +443,7 @@ BOOST_AUTO_TEST_CASE(test_cfg_only_option_in_cmd_line)
     BOOST_CHECK_THROW(config::instance().parse_cmd_line(2, argv), raconfig::config_error);
 }
 
-struct bad_cfg_file_fixture: basic_file_fixture<bad_cfg_file_fixture>
+struct bad_cfg_file_fixture: file_fixture<bad_cfg_file_fixture>
 {
     void write(std::ostream& file)
     {
@@ -467,13 +467,24 @@ BOOST_AUTO_TEST_CASE(test_no_cfg_file)
     BOOST_CHECK_THROW(config::instance().parse_cmd_line(2, argv), raconfig::config_error);
 }
 
-BOOST_AUTO_TEST_CASE(test_option_check_failed)
+struct option_check_failed_fixture: file_fixture<option_check_failed_fixture>
+{
+    void write(std::ostream& file)
+    {
+        file << "[power2]\n"
+                "item=16\n"
+                "item=17\n"; // not the power of 2
+    }
+};
+
+BOOST_FIXTURE_TEST_CASE(test_option_check_failed, option_check_failed_fixture)
 {
     const char *argv[] = {"",
         "--power2=16",
         "--power2=17" // not the power of 2
     };
     BOOST_CHECK_THROW(config::instance().parse_cmd_line(3, argv), raconfig::config_error);
+    BOOST_CHECK_THROW(config::instance().parse_file("test.ini"), raconfig::config_error);
 }
 
 BOOST_AUTO_TEST_CASE(test_callbacks)
