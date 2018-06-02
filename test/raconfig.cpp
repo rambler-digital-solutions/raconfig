@@ -16,11 +16,13 @@
 
 #define BOOST_TEST_DYN_LINK
 #define BOOST_TEST_MODULE raconfig
-#define RACONFIG_VERSION_STRING "version test"
 #include <boost/test/unit_test.hpp>
+
+#define RACONFIG_VERSION_STRING "version test"
 #include <raconfig/raconfig.hpp>
 #include <raconfig/raconfig_set.hpp>
 #include <raconfig/raconfig_unordered_set.hpp>
+
 #include <fstream>
 
 namespace option
