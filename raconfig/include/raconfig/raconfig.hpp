@@ -134,7 +134,7 @@ struct name{};
 struct cmd_name{};
 struct cfg_name{};
 struct description{};
-struct check_backend{};
+struct check_value{};
 
 template<class Option, class Name>
 void init_option(po::options_description_easy_init& init, Option& option, Name name)
@@ -265,8 +265,8 @@ private:
 
         // notify command line options after config
         detail::po::notify(vm);
-        RACONFIG_FOLD(detail::get<Ts>(tmp)(detail::check_backend{}));
         RACONFIG_FOLD(detail::get<Ts>(tmp)(detail::transform_backend{}));
+        RACONFIG_FOLD(detail::get<Ts>(tmp)(detail::check_value{}));
         options_ = std::move(tmp);
 
         if (vm.count("show-config")) {
@@ -310,11 +310,12 @@ private:
         const char* operator ()(raconfig::detail::cmd_name) const noexcept { return (cmd_name_); } \
         const char* operator ()(raconfig::detail::cfg_name) const noexcept { return (cfg_name_); } \
         const char* operator ()(raconfig::detail::description) const noexcept { return (description_); } \
-        void operator ()(raconfig::detail::check_backend) const \
+        void operator ()(raconfig::detail::check_value) const \
         { \
-            if (!(pred)(**this)) \
+            auto& v = (*this)(raconfig::detail::get_user_type{}); \
+            if (!(pred)(v)) \
                 raconfig::detail::throw_option_check_failed(#tag, \
-                        raconfig::detail::to_string(**this).c_str()); \
+                        raconfig::detail::to_string(v).c_str());  \
         } \
         tag(): raconfig::detail::option_value<type>{default_value} {} \
     };

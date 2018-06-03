@@ -181,11 +181,13 @@ BOOST_AUTO_TEST_SUITE_END() // easy_test_suite
 
 BOOST_AUTO_TEST_SUITE(containers_test_suite)
 
-bool is_odd(std::vector<int> const& numbers)
+template<class Range>
+bool is_odd(Range const& numbers)
 {
-    return std::all_of(numbers.begin(), numbers.end(), [](int x) {
-        return x % 2 != 0;
-    });
+    for (auto it = std::begin(numbers); it != std::end(numbers); ++it)
+        if (*it % 2 == 0)
+            return false;
+    return true;
 }
 
 RACONFIG_OPTION_EASY(def_vector_1,
@@ -195,20 +197,26 @@ RACONFIG_OPTION(def_vector_2,
     RACONFIG_T(std::vector<int, std::allocator<int>>), RACONFIG_V({4, 5, 6}),
     RACONFIG_NO_NAME, RACONFIG_NO_NAME, "Default vector 2")
 RACONFIG_OPTION_CHECKED(def_vector_3,
-    RACONFIG_T(std::vector<int, std::allocator<int>>), RACONFIG_V({5, 7, 9}), &is_odd,
+    RACONFIG_T(std::vector<int, std::allocator<int>>), RACONFIG_V({5, 7, 9}),
+    RACONFIG_V(&is_odd<std::vector<int, std::allocator<int>>>),
     RACONFIG_NO_NAME, RACONFIG_NO_NAME, "Default vector 3")
-RACONFIG_OPTION_CHECKED(vector, std::vector<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(vector, std::vector<int>, {},
+    &is_odd<std::vector<int>>,
     "vector-item", RACONFIG_NO_NAME, "Vector")
-RACONFIG_OPTION_CHECKED(set, std::set<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(set, std::set<int>, {},
+    &is_odd<std::set<int>>,
     "set-item", RACONFIG_NO_NAME, "Ordered set")
-RACONFIG_OPTION_CHECKED(default_set, RACONFIG_T(std::set<int, std::greater<int>>),
-    RACONFIG_V({1, 3}), &is_odd,
+RACONFIG_OPTION_CHECKED(default_set, RACONFIG_T(std::set<int, std::greater<int>>), RACONFIG_V({1, 3}),
+    RACONFIG_V(&is_odd<std::set<int, std::greater<int>>>),
     RACONFIG_NO_NAME, RACONFIG_NO_NAME, "Default ordered set")
-RACONFIG_OPTION_CHECKED(multiset, std::multiset<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(multiset, std::multiset<int>, {},
+    &is_odd<std::multiset<int>>,
     "multiset-item", RACONFIG_NO_NAME, "Ordered multiset")
-RACONFIG_OPTION_CHECKED(unordered_set, std::unordered_set<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(unordered_set, std::unordered_set<int>, {},
+    &is_odd<std::unordered_set<int>>,
     "unordered-set-item", RACONFIG_NO_NAME, "Unordered set")
-RACONFIG_OPTION_CHECKED(unordered_multiset, std::unordered_multiset<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(unordered_multiset, std::unordered_multiset<int>, {},
+    &is_odd<std::unordered_multiset<int>>,
     "unordered-multiset-item", RACONFIG_NO_NAME, "Unordered multiset")
 
 using config = raconfig::config<raconfig::default_actions,

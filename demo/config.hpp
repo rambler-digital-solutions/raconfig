@@ -20,8 +20,6 @@
 #include <raconfig/raconfig.hpp>
 #include <raconfig/raconfig_set.hpp>
 
-bool check_power2(std::vector<unsigned> const& v);
-
 enum class color
 {
     red,
@@ -53,7 +51,11 @@ RACONFIG_OPTION(flag, bool, false,
 RACONFIG_OPTION_CHECKED(power2,
     RACONFIG_T(std::set<unsigned, std::greater<unsigned>>),
     RACONFIG_V({32, 64, 128}),
-    check_power2,
+    [](std::set<unsigned, std::greater<unsigned>> const& v) {
+        return std::all_of(v.begin(), v.end(), [](unsigned x) {
+            return x > 0 && (x & (x - 1)) == 0;
+        });
+    },
     "power2",           // --power2=4 --power2=8 --power2=4
     "power2.item",      // [power2]
                         // item = 4
