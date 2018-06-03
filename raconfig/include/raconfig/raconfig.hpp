@@ -103,12 +103,6 @@ std::string to_string(T const& v)
     return type_proxy<T>::to_string(v);
 }
 
-template<class T>
-void show_option(default_actions& actions, const char *name, T const& v)
-{
-    return type_proxy<T>::show_option(actions, name, v);
-}
-
 template<class T, class Allocator>
 struct type_proxy<std::vector<T, Allocator>>:
     type_proxy_range<std::vector<T, Allocator>>
@@ -136,30 +130,31 @@ T deduce_value_backend_type(option_value_backend<T>&&) noexcept;
 template<class Option>
 using value_backend_type = decltype(deduce_value_backend_type(std::declval<Option>()));
 
-template<class Option>
-void notifier(value_backend_type<Option> const& v)
+struct name{};
+struct cmd_name{};
+struct cfg_name{};
+struct description{};
+struct check_backend{};
+
+template<class Option, class Name>
+void init_option(po::options_description_easy_init& init, Option& option, Name name)
 {
-    if (!Option::_::check(v)) {
-        std::string what = "the argument ('";
-        what.append(to_string(v)).append("') check for option '");
-        what.append(Option::_::name()).append("' failed");
-        throw config_error{what};
-    }
+    if (option(name))
+        init(option(name),
+             po::value(&*option),
+             option(description{}));
 }
 
-template<class Fn>
-void with_config_error(Fn&& fn)
+template<class Option>
+void show_option(default_actions& actions, Option const& option)
 {
-    try {
-        fn();
-    } catch (config_error const& e) {
-        throw; // rethrow as is
-    } catch (std::exception const& e) {
-        std::throw_with_nested(config_error{e.what()});
-    } catch (...) {
-        std::throw_with_nested(config_error{"unknown exception"});
-    }
+    auto& v = option(get_user_type{});
+    return type_proxy<typename std::remove_const<
+        typename std::remove_reference<decltype(v)>::type
+            >::type>::show_option(actions, option(name{}), v);
 }
+
+void throw_option_check_failed(const char *name, const char *value);
 
 } // namespace detail
 
@@ -203,18 +198,23 @@ public:
 
     void parse_cmd_line(int argc, const char* const argv[])
     {
-        detail::with_config_error([this, argc, argv](){
+        try {
             parse_cmd_line_impl(argc, argv);
-            notify();
-        });
+        } catch (config_error const& e) {
+            throw;
+        } catch (std::exception const& e) {
+            std::throw_with_nested(config_error{e.what()});
+        } catch (...) {
+            std::throw_with_nested(config_error{"unknown exception"});
+        }
+        for (auto cb: callbacks_)
+            cb();
     }
 
     void parse_file(const char *path)
     {
-        detail::with_config_error([this, path](){
-            parse_file_impl(path);
-            notify();
-        });
+        const char* args[] = {"", "--config", path};
+        parse_cmd_line(3, args);
     }
 
     void add_callback(void (*cb)())
@@ -239,22 +239,18 @@ private:
 
     void parse_cmd_line_impl(int argc, const char* const argv[])
     {
-        namespace po = detail::po;
-
         std::tuple<Ts...> tmp;
-        po::options_description desc{"Allowed options"};
+        detail::po::options_description desc{"Allowed options"};
         auto options = desc.add_options();
         options("help", "Show this message and exit");
 #ifdef RACONFIG_VERSION_STRING
         options("version", "Show version and exit");
 #endif
         options("show-config", "Show final configuration and exit");
-        options("config", po::value<std::string>(),
+        options("config", detail::po::value<std::string>(),
                 "Load options from file, command line options override ones from file");
-        RACONFIG_FOLD(!Ts::_::cmd_name() ? 0 : (options(Ts::_::cmd_name(),
-                po::value(&*detail::get<Ts>(tmp))->notifier(&detail::notifier<Ts>),
-                Ts::_::description()), 0));
-        po::variables_map vm;
+        RACONFIG_FOLD(detail::init_option(options, detail::get<Ts>(tmp), detail::cmd_name{}));
+        detail::po::variables_map vm;
         detail::parse_command_line(argc, argv, desc, vm);
 
         if (vm.count("help"))
@@ -268,43 +264,27 @@ private:
             parse_file_impl(config_value.as<std::string>().c_str(), tmp);
 
         // notify command line options after config
-        po::notify(vm);
+        detail::po::notify(vm);
+        RACONFIG_FOLD(detail::get<Ts>(tmp)(detail::check_backend{}));
         RACONFIG_FOLD(detail::get<Ts>(tmp)(detail::transform_backend{}));
         options_ = std::move(tmp);
 
         if (vm.count("show-config")) {
             Actions actions;
             actions.show_config_begin();
-            RACONFIG_FOLD(detail::show_option(actions, Ts::_::name(), get<Ts>()));
+            RACONFIG_FOLD(detail::show_option(actions, detail::get<Ts>(options_)));
             actions.show_config_end();
         }
     }
 
     void parse_file_impl(const char *path, std::tuple<Ts...>& tmp)
     {
-        namespace po = detail::po;
-
-        po::options_description desc;
+        detail::po::options_description desc;
         auto options = desc.add_options();
-        RACONFIG_FOLD(!Ts::_::cfg_name() ? 0 : (options(Ts::_::cfg_name(),
-                po::value(&*detail::get<Ts>(tmp))->notifier(&detail::notifier<Ts>)), 0));
-        po::variables_map vm;
+        RACONFIG_FOLD(detail::init_option(options, detail::get<Ts>(tmp), detail::cfg_name{}));
+        detail::po::variables_map vm;
         detail::parse_config_file(path, desc, vm);
-        po::notify(vm);
-    }
-
-    void parse_file_impl(const char *path)
-    {
-        std::tuple<Ts...> tmp;
-        parse_file_impl(path, tmp);
-        RACONFIG_FOLD(detail::get<Ts>(tmp)(detail::transform_backend{}));
-        options_ = std::move(tmp);
-    }
-
-    void notify() const
-    {
-        for (auto cb: callbacks_)
-            cb();
+        detail::po::notify(vm);
     }
 
     std::tuple<Ts...> options_;
@@ -325,15 +305,17 @@ private:
 #define RACONFIG_OPTION_CHECKED(tag, type, default_value, pred, cmd_name_, cfg_name_, description_) \
     struct tag final: raconfig::detail::option_value<type> \
     { \
-        struct _ \
+        using raconfig::detail::option_value<type>::operator (); \
+        const char* operator ()(raconfig::detail::name) const noexcept { return #tag; } \
+        const char* operator ()(raconfig::detail::cmd_name) const noexcept { return (cmd_name_); } \
+        const char* operator ()(raconfig::detail::cfg_name) const noexcept { return (cfg_name_); } \
+        const char* operator ()(raconfig::detail::description) const noexcept { return (description_); } \
+        void operator ()(raconfig::detail::check_backend) const \
         { \
-        static const char* name() { return #tag; } \
-        static const char* cmd_name() { return (cmd_name_); } \
-        static const char* cfg_name() { return (cfg_name_); } \
-        static const char* description() { return (description_); } \
-        static bool check(raconfig::detail::value_backend_type< \
-                raconfig::detail::option_value<type>> const& v) { return (pred)(v); } \
-        }; \
+            if (!(pred)(**this)) \
+                raconfig::detail::throw_option_check_failed(#tag, \
+                        raconfig::detail::to_string(**this).c_str()); \
+        } \
         tag(): raconfig::detail::option_value<type>{default_value} {} \
     };
 

@@ -52,6 +52,14 @@ RACONFIG_INLINE void parse_config_file(const char *path,
     po::store(po::parse_config_file<char>(path, desc, false), vm);
 }
 
+RACONFIG_INLINE void throw_option_check_failed(const char *name, const char *value)
+{
+    std::string what = "the argument ('";
+    what.append(value).append("') check for option '");
+    what.append(name).append("' failed");
+    throw config_error{what};
+}
+
 } // namespace detail
 
 RACONFIG_INLINE void default_actions::help(detail::po::options_description const& desc)

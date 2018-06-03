@@ -195,7 +195,7 @@ RACONFIG_OPTION(def_vector_2,
     RACONFIG_T(std::vector<int, std::allocator<int>>), RACONFIG_V({4, 5, 6}),
     RACONFIG_NO_NAME, RACONFIG_NO_NAME, "Default vector 2")
 RACONFIG_OPTION_CHECKED(def_vector_3,
-    RACONFIG_T(std::vector<int, std::allocator<int>>), RACONFIG_V({7, 8, 9}), &is_odd,
+    RACONFIG_T(std::vector<int, std::allocator<int>>), RACONFIG_V({5, 7, 9}), &is_odd,
     RACONFIG_NO_NAME, RACONFIG_NO_NAME, "Default vector 3")
 RACONFIG_OPTION_CHECKED(vector, std::vector<int>, {}, &is_odd,
     "vector-item", RACONFIG_NO_NAME, "Vector")
@@ -229,7 +229,7 @@ BOOST_AUTO_TEST_CASE(test_vector)
     cfg.parse_cmd_line(7, argv);
     BOOST_CHECK((cfg.get<def_vector_1>() == std::vector<int>{1, 2, 3}));
     BOOST_CHECK((cfg.get<def_vector_2>() == std::vector<int>{4, 5, 6}));
-    BOOST_CHECK((cfg.get<def_vector_3>() == std::vector<int>{7, 8, 9}));
+    BOOST_CHECK((cfg.get<def_vector_3>() == std::vector<int>{5, 7, 9}));
     BOOST_CHECK((cfg.get<vector>() == std::vector<int>{7, 7, 5, 3, 3, 1}));
 }
 
