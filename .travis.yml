@@ -50,5 +50,5 @@ install:
 
 script:
   - mkdir -p build && cd build && rm -rf *
-  - cmake ..
+  - cmake .. -DBUILD_DEMO=1 -DBUILD_TEST=1
   - make VERBOSE=1 && ctest --verbose
