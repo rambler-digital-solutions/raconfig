@@ -14,6 +14,5 @@
 // limitations under the License.
 //
 
-#define RACONFIG_LIB
 #include <raconfig/raconfig.hpp>
 #include <raconfig/raconfig.ipp>

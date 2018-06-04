@@ -16,11 +16,13 @@
 
 #define BOOST_TEST_DYN_LINK
 #define BOOST_TEST_MODULE raconfig
-#define RACONFIG_VERSION_STRING "version test"
 #include <boost/test/unit_test.hpp>
+
+#define RACONFIG_VERSION_STRING "version test"
 #include <raconfig/raconfig.hpp>
 #include <raconfig/raconfig_set.hpp>
 #include <raconfig/raconfig_unordered_set.hpp>
+
 #include <fstream>
 
 namespace option
@@ -97,9 +99,9 @@ using config = raconfig::config<actions,
     option::power2>;
 
 template<class T>
-struct basic_file_fixture
+struct file_fixture
 {
-    basic_file_fixture()
+    file_fixture()
     {
         std::remove("test.ini");
         std::ofstream file;
@@ -145,7 +147,7 @@ BOOST_AUTO_TEST_CASE(test_cmd_line)
     BOOST_CHECK_EQUAL(cfg.get<value_type>(), 456);
 }
 
-struct easy_file_fixture: basic_file_fixture<easy_file_fixture>
+struct easy_file_fixture: file_fixture<easy_file_fixture>
 {
     void write(std::ostream& file)
     {
@@ -179,11 +181,13 @@ BOOST_AUTO_TEST_SUITE_END() // easy_test_suite
 
 BOOST_AUTO_TEST_SUITE(containers_test_suite)
 
-bool is_odd(std::vector<int> const& numbers)
+template<class Range>
+bool is_odd(Range const& numbers)
 {
-    return std::all_of(numbers.begin(), numbers.end(), [](int x) {
-        return x % 2 != 0;
-    });
+    for (auto it = std::begin(numbers); it != std::end(numbers); ++it)
+        if (*it % 2 == 0)
+            return false;
+    return true;
 }
 
 RACONFIG_OPTION_EASY(def_vector_1,
@@ -193,20 +197,26 @@ RACONFIG_OPTION(def_vector_2,
     RACONFIG_T(std::vector<int, std::allocator<int>>), RACONFIG_V({4, 5, 6}),
     RACONFIG_NO_NAME, RACONFIG_NO_NAME, "Default vector 2")
 RACONFIG_OPTION_CHECKED(def_vector_3,
-    RACONFIG_T(std::vector<int, std::allocator<int>>), RACONFIG_V({7, 8, 9}), &is_odd,
+    RACONFIG_T(std::vector<int, std::allocator<int>>), RACONFIG_V({5, 7, 9}),
+    RACONFIG_V(&is_odd<std::vector<int, std::allocator<int>>>),
     RACONFIG_NO_NAME, RACONFIG_NO_NAME, "Default vector 3")
-RACONFIG_OPTION_CHECKED(vector, std::vector<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(vector, std::vector<int>, {},
+    &is_odd<std::vector<int>>,
     "vector-item", RACONFIG_NO_NAME, "Vector")
-RACONFIG_OPTION_CHECKED(set, std::set<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(set, std::set<int>, {},
+    &is_odd<std::set<int>>,
     "set-item", RACONFIG_NO_NAME, "Ordered set")
-RACONFIG_OPTION_CHECKED(default_set, RACONFIG_T(std::set<int, std::greater<int>>),
-    RACONFIG_V({1, 3}), &is_odd,
+RACONFIG_OPTION_CHECKED(default_set, RACONFIG_T(std::set<int, std::greater<int>>), RACONFIG_V({1, 3}),
+    RACONFIG_V(&is_odd<std::set<int, std::greater<int>>>),
     RACONFIG_NO_NAME, RACONFIG_NO_NAME, "Default ordered set")
-RACONFIG_OPTION_CHECKED(multiset, std::multiset<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(multiset, std::multiset<int>, {},
+    &is_odd<std::multiset<int>>,
     "multiset-item", RACONFIG_NO_NAME, "Ordered multiset")
-RACONFIG_OPTION_CHECKED(unordered_set, std::unordered_set<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(unordered_set, std::unordered_set<int>, {},
+    &is_odd<std::unordered_set<int>>,
     "unordered-set-item", RACONFIG_NO_NAME, "Unordered set")
-RACONFIG_OPTION_CHECKED(unordered_multiset, std::unordered_multiset<int>, {}, &is_odd,
+RACONFIG_OPTION_CHECKED(unordered_multiset, std::unordered_multiset<int>, {},
+    &is_odd<std::unordered_multiset<int>>,
     "unordered-multiset-item", RACONFIG_NO_NAME, "Unordered multiset")
 
 using config = raconfig::config<raconfig::default_actions,
@@ -227,7 +237,7 @@ BOOST_AUTO_TEST_CASE(test_vector)
     cfg.parse_cmd_line(7, argv);
     BOOST_CHECK((cfg.get<def_vector_1>() == std::vector<int>{1, 2, 3}));
     BOOST_CHECK((cfg.get<def_vector_2>() == std::vector<int>{4, 5, 6}));
-    BOOST_CHECK((cfg.get<def_vector_3>() == std::vector<int>{7, 8, 9}));
+    BOOST_CHECK((cfg.get<def_vector_3>() == std::vector<int>{5, 7, 9}));
     BOOST_CHECK((cfg.get<vector>() == std::vector<int>{7, 7, 5, 3, 3, 1}));
 }
 
@@ -390,7 +400,7 @@ BOOST_AUTO_TEST_CASE(test_cmd_line)
     BOOST_CHECK((cfg.get<option::power2>() == std::vector<unsigned>{8, 32}));
 }
 
-struct cfg_file_fixture: basic_file_fixture<cfg_file_fixture>
+struct cfg_file_fixture: file_fixture<cfg_file_fixture>
 {
     void write(std::ostream& file)
     {
@@ -443,7 +453,7 @@ BOOST_AUTO_TEST_CASE(test_cfg_only_option_in_cmd_line)
     BOOST_CHECK_THROW(config::instance().parse_cmd_line(2, argv), raconfig::config_error);
 }
 
-struct bad_cfg_file_fixture: basic_file_fixture<bad_cfg_file_fixture>
+struct bad_cfg_file_fixture: file_fixture<bad_cfg_file_fixture>
 {
     void write(std::ostream& file)
     {
@@ -467,13 +477,24 @@ BOOST_AUTO_TEST_CASE(test_no_cfg_file)
     BOOST_CHECK_THROW(config::instance().parse_cmd_line(2, argv), raconfig::config_error);
 }
 
-BOOST_AUTO_TEST_CASE(test_option_check_failed)
+struct option_check_failed_fixture: file_fixture<option_check_failed_fixture>
+{
+    void write(std::ostream& file)
+    {
+        file << "[power2]\n"
+                "item=16\n"
+                "item=17\n"; // not the power of 2
+    }
+};
+
+BOOST_FIXTURE_TEST_CASE(test_option_check_failed, option_check_failed_fixture)
 {
     const char *argv[] = {"",
         "--power2=16",
         "--power2=17" // not the power of 2
     };
     BOOST_CHECK_THROW(config::instance().parse_cmd_line(3, argv), raconfig::config_error);
+    BOOST_CHECK_THROW(config::instance().parse_file("test.ini"), raconfig::config_error);
 }
 
 BOOST_AUTO_TEST_CASE(test_callbacks)

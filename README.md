@@ -21,7 +21,7 @@ and bind them to the generic configuration singleton.
 using config = raconfig::config<T1, T2, ..., Tn>;
 ```
 
-Accessing each option is type safe thus you can't access an unknown option. Also changing option type to non compatible with depending code causes compilation to fail (or to produce a warning message at least).
+Accessing each option is type safe thus you can't access an unknown option. Also changing option type to non compatible with dependent code causes compilation to fail (or to produce a warning message at least).
 
 ```cpp
 config::instance().get<Tn>();
@@ -38,14 +38,13 @@ config::instance().get<Tn>();
 
 namespace option
 {
-RACONFIG_OPTION_EASY(host, RACONFIG_T(std::string), RACONFIG_V("localhost"),
-                     "Listening host")
-RACONFIG_OPTION_EASY(port, RACONFIG_T(unsigned short), RACONFIG_V(80),
-                     "Listening port")
+RACONFIG_OPTION_EASY(host, std::string, "localhost", "Listening host")
+RACONFIG_OPTION_EASY(port, unsigned short, 80, "Listening port")
 }
 
 using config = raconfig::config<raconfig::default_actions,
-                                option::host, option::port>;
+    option::host,
+    option::port>;
 
 int main(int argc, char* argv[])
 {
@@ -61,7 +60,7 @@ int main(int argc, char* argv[])
 }
 ```
 
-Now you can run compiled program with declared options.
+Now you can run compiled program with the defined options.
 
 ```sh
 $ ./a.out --host=127.0.0.1 --port=8080
@@ -84,14 +83,14 @@ Allowed options:
   --port arg            Listening port
 ```
 
-`version` option depends on definition of `RACONFIG_VERSION_STRING` macro. Option is not visible if the macro is not defined before `raconfig/raconfig.hpp` is included. Very often version is determined before actual compilation (somewhere in CMake script, for example) so there is no need to define `RACONFIG_VERSION_STRING` explicitly in source file.
+`version` option depends on the definition of `RACONFIG_VERSION_STRING` macro. Option is not visible if the macro is not defined before `raconfig/raconfig.hpp` is included. Very often version is determined before actual compilation (somewhere in CMake script, for example) so there is no need to define `RACONFIG_VERSION_STRING` explicitly in a source file.
 
 ```
 $ ./a.out --version
 MyApp 1.0.0
 ```
 
-`show-config` option dumps config instance state to the standard output stream.
+`show-config` option dumps user defined options' names and their values to the standard output stream.
 
 ```
 $ ./a.out --show-config --host=192.168.1.1
@@ -99,7 +98,7 @@ host = 192.168.1.1
 port = 80
 ```
 
-`config` option specifies path to a configuration file. Configuration file format is a simple INI-like format acceptable by **Boost.Program Options** [configuration file parser](https://www.boost.org/doc/libs/1_54_0/doc/html/program_options/overview.html#idp123376208). For example:
+`config` option specifies a path to a configuration file. Configuration file format is a simple INI-like format acceptable by **Boost.Program Options** [configuration file parser](https://www.boost.org/doc/libs/1_54_0/doc/html/program_options/overview.html#idp123376208). For example:
 
 ```ini
 # listening host
@@ -116,13 +115,13 @@ host = host.from.cmd.line
 port = 12345
 ```
 
-You can change program reaction on predefined command line options deriving your custom type from `raconfig::default_actions` and overriding needed methods. See demo project for details.
+You can change program reaction on the predefined command line options deriving your custom type from `raconfig::default_actions` and overriding needed methods. See demo project for details.
 
 ## Customizing options look & feel
 
 ### Change options layout
 
-`RACONFIG_OPTION_EASY` is the shortended version of `RACONFIG_OPTION` macro. `RACONFIG_OPTION` allows you to specify custom option name for command line and file sources respectively. If an option shouldn't be available in command line or file or both, use `RACONFIG_NO_NAME` replacement. In the following example `option::backlog` is accessable only via configuration file.
+`RACONFIG_OPTION_EASY` is the shortended version of `RACONFIG_OPTION` macro. `RACONFIG_OPTION` allows to specify custom option name for command line and file sources respectively. If an option shouldn't be available in command line or file or both, use `RACONFIG_NO_NAME` replacement. In the following example `option::backlog` is accessable only via configuration file.
 
 ```cpp
 #include <raconfig/raconfig.hpp>
@@ -130,19 +129,18 @@ You can change program reaction on predefined command line options deriving your
 
 namespace option
 {
-RACONFIG_OPTION(host, RACONFIG_T(std::string), RACONFIG_V("localhost"),
-                "server-host", "server.host",
-                "Listening host")
-RACONFIG_OPTION(port, RACONFIG_T(unsigned short), RACONFIG_V(80),
-                "server-port", "server.port",
-                "Listening port")
-RACONFIG_OPTION(backlog, RACONFIG_T(unsigned), RACONFIG_V(512),
-                RACONFIG_NO_NAME, "server.backlog",
-                "Connection backlog")
+RACONFIG_OPTION(host, std::string, "localhost",
+    "server-host", "server.host", "Listening host")
+RACONFIG_OPTION(port, unsigned short, 80,
+    "server-port", "server.port", "Listening port")
+RACONFIG_OPTION(backlog, unsigned, 512,
+    RACONFIG_NO_NAME, "server.backlog", "Connection backlog")
 }
 
 using config = raconfig::config<raconfig::default_actions,
-                                option::host, option::port, option::backlog>;
+    option::host,
+    option::port,
+    option::backlog>;
 
 int main(int argc, char* argv[])
 {
@@ -177,24 +175,24 @@ Running on 11.12.13.14:2012 [2048]
 
 ### Add value constraints
 
-Raconfig allows you to specify option value verifier via `RACONFIG_OPTION_CHECKED` macro. The 4th parameter is the callable (normal function or in-place lambda) returning `true` if an input value is correct. If the callable returns `false` exception `raconfig::config_error` is thrown.
+Raconfig allows to specify option value verifier via `RACONFIG_OPTION_CHECKED` macro. The 4th parameter is the callable (normal function or in-place lambda) returning `true` if an input value is correct. If the callable returns `false` exception `raconfig::config_error` is thrown.
 
 ```cpp
-bool check_port(unsigned short v) { return v == 80 || v > 1023; }
+bool check_port(unsigned short v)
+{
+    return v == 80 || v > 1023;
+}
 
 namespace option
 {
-RACONFIG_OPTION(host, RACONFIG_T(std::string), RACONFIG_V("localhost"),
-                "server-host", "server.host",
-                "Listening host")
-RACONFIG_OPTION_CHECKED(port, RACONFIG_T(unsigned short), RACONFIG_V(80),
-                &check_port,
-                "server-port", "server.port",
-                "Listening port")
-RACONFIG_OPTION_CHECKED(backlog, RACONFIG_T(unsigned), RACONFIG_V(512),
-                [](unsigned v) { return 0 < v && v <= 4096; },
-                RACONFIG_NO_NAME, "server.backlog",
-                "Connection backlog")
+// ...
+RACONFIG_OPTION_CHECKED(port, unsigned short, 80,
+    &check_port,
+    "server-port", "server.port", "Listening port")
+RACONFIG_OPTION_CHECKED(backlog, unsigned, 512,
+    [](unsigned v) { return 0 < v && v <= 4096; },
+    RACONFIG_NO_NAME, "server.backlog", "Connection backlog")
+// ...
 }
 ```
 
@@ -208,15 +206,20 @@ RACONFIG_OPTION_CHECKED(backlog, RACONFIG_T(unsigned), RACONFIG_V(512),
 namespace option
 {
 // ...
-RACONFIG_OPTION(blacklist, RACONFIG_T(std::vector<std::string>),
-                RACONFIG_V({"localhost", "127.0.0.1"}),
-                "blackhost", "blacklist.item", "List of dangerous hosts")
+RACONFIG_OPTION(blacklist, std::vector<std::string>,
+    RACONFIG_V({"localhost", "127.0.0.1"}),
+    "blackhost", "blacklist.item", "List of dangerous hosts")
 // ...
 }
 
-using config = raconfig::config<raconfig::default_actions, option::host,
-                                option::port, option::backlog, option::blacklist>;
+using config = raconfig::config<raconfig::default_actions,
+    option::host,
+    option::port,
+    option::backlog,
+    option::blacklist>;
 ```
+
+When an option default value is complex and contains commas use `RACONFIG_V` wrapper to prevent preprocessor from splitting it to the list of tokens.
 
 ```
 $ ./a.out --show-config
@@ -239,12 +242,14 @@ namespace option
 {
 // ...
 RACONFIG_OPTION(blacklist,
-                RACONFIG_T(std::set<std::string, std::less<std::string>>),
-                RACONFIG_V({}),
-                "blackhost", "blacklist.item", "List of dangerous hosts")
+    RACONFIG_T(std::set<std::string, std::less<std::string>>),
+    RACONFIG_V({"localhost", "127.0.0.1"}),
+    "blackhost", "blacklist.item", "List of dangerous hosts")
 // ...
 }
 ```
+
+`RACONFIG_T` macro is used to wrap a complex type definition containing commas as well as `RACONFIG_V` in the previous example.
 
 ```
 $ ./a.out --show-config --blackhost=h1 --blackhost=h2 --blackhost=h1
@@ -255,33 +260,11 @@ blacklist[0] = h1
 blacklist[1] = h2
 ```
 
-Raconfig option with ordered/unordered set type is based on the standard vector performing appropriate conversion after successful parsing. Thus verifier for such option should accept a reference to `std::vector<T, Allocator>`.
-
-```cpp
-bool check_host(std::string const& v)
-{
-    return std::all_of(v.begin(), v.end(), [](char c) {
-        return c == '.' || ::isalnum(c);
-    });
-}
-
-namespace option
-{
-// ...
-RACONFIG_OPTION_CHECKED(blacklist,
-                RACONFIG_T(std::set<std::string, std::less<std::string>>),
-                RACONFIG_V({}),
-                [](std::vector<std::string> const& v) {
-                    return std::all_of(v.begin(), v.end(), &check_host);
-                },
-                "blackhost", "blacklist.item", "List of dangerous hosts")
-// ...
-}
-```
+Raconfig option with ordered/unordered set type is based on the standard vector performing appropriate conversion after successful parsing.
 
 ## Config update callbacks
 
-Raconfig supports callbacks on configuration changes. Callbacks allow to initialize different subsystems locally without bloating the main function. Config parsing is assumed to happen in main thread before any action thus callbacks are not thread safe.
+Raconfig supports callbacks on configuration changes. Callbacks allow to initialize different subsystems locally without bloating the main function. Config parsing is assumed to happen in the main thread before any action thus callbacks are not thread safe.
 
 ```cpp
 using config = raconfig::config<raconfig::default_actions, ...>;
@@ -293,3 +276,9 @@ config::callback const cb([]() {
                   cfg.get<option::backlog>());
 });
 ```
+
+## Requirements
+
+* C++11 compatible compiler (GCC >= 4.8.0, Clang >= 3.8.0)
+* CMake >= 3.0
+* Boost.Program Options development files
