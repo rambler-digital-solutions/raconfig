@@ -17,8 +17,7 @@
 #ifndef RACONFIG_HPP
 #define RACONFIG_HPP
 
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/variables_map.hpp>
+#include <boost/program_options/value_semantic.hpp>
 #include <tuple>
 #include "raconfig_range.hpp"
 
@@ -34,7 +33,6 @@ public:
 
 namespace detail
 {
-namespace po = boost::program_options;
 
 #if __cplusplus < 201402L
 
@@ -71,17 +69,6 @@ template<class T, class ...Ts>
 T& get(std::tuple<Ts...>& t) noexcept { return std::get<T>(t); }
 
 #endif
-
-template<class T>
-constexpr bool skip_option_check(T&&) { return true; }
-
-void parse_command_line(int argc, const char* const argv[],
-        po::options_description const& desc,
-        po::variables_map& vm);
-
-void parse_config_file(const char *path,
-        po::options_description const& desc,
-        po::variables_map& vm);
 
 template<class T>
 struct type_proxy
@@ -130,20 +117,38 @@ T deduce_value_backend_type(option_value_backend<T>&&) noexcept;
 template<class Option>
 using value_backend_type = decltype(deduce_value_backend_type(std::declval<Option>()));
 
+class options_parser
+{
+public:
+    options_parser(const char *header = "");
+
+    options_parser(options_parser const&) = delete;
+    options_parser& operator = (options_parser const&) = delete;
+    options_parser(options_parser&&) = delete;
+    options_parser& operator = (options_parser&&) = delete;
+
+    void add(const char *name, const char *description, boost::program_options::value_semantic const *s = nullptr);
+    void parse_command_line(int argc, const char* const argv[]);
+    void parse_config_file(const char *path);
+    void notify();
+
+    bool has(const char *name) const;
+    bool get(const char *name, std::string& value) const;
+
+    operator boost::program_options::options_description const& () const noexcept;
+
+    ~options_parser();
+
+private:
+    struct impl;
+    impl *impl_;
+};
+
 struct name{};
 struct cmd_name{};
 struct cfg_name{};
 struct description{};
 struct check_value{};
-
-template<class Option, class Name>
-void init_option(po::options_description_easy_init& init, Option& option, Name name)
-{
-    if (option(name))
-        init(option(name),
-             po::value(&*option),
-             option(description{}));
-}
 
 template<class Option>
 void show_option(default_actions& actions, Option const& option)
@@ -153,6 +158,9 @@ void show_option(default_actions& actions, Option const& option)
         typename std::remove_reference<decltype(v)>::type
             >::type>::show_option(actions, option(name{}), v);
 }
+
+template<class T>
+constexpr bool skip_option_check(T&&) { return true; }
 
 void throw_option_check_failed(const char *name, const char *value);
 
@@ -240,51 +248,48 @@ private:
     void parse_cmd_line_impl(int argc, const char* const argv[])
     {
         std::tuple<Ts...> tmp;
-        detail::po::options_description desc{"Allowed options"};
-        auto options = desc.add_options();
-        options("help", "Show this message and exit");
+        detail::options_parser p{"Allowed options"};
+        p.add("help", "Show this message and exit");
 #ifdef RACONFIG_VERSION_STRING
-        options("version", "Show version and exit");
+        p.add("version", "Show version and exit");
 #endif
-        options("show-config", "Show final configuration and exit");
-        options("config", detail::po::value<std::string>(),
-                "Load options from file, command line options override ones from file");
-        RACONFIG_FOLD(detail::init_option(options, detail::get<Ts>(tmp), detail::cmd_name{}));
-        detail::po::variables_map vm;
-        detail::parse_command_line(argc, argv, desc, vm);
+        p.add("show-config", "Show final configuration and exit");
+        p.add("config", "Load options from file, command line options override ones from file",
+              boost::program_options::value<std::string>());
+        RACONFIG_FOLD(!detail::get<Ts>(tmp)(detail::cmd_name{}) ? (void)0
+                      : p.add(detail::get<Ts>(tmp)(detail::cmd_name{}),
+                              detail::get<Ts>(tmp)(detail::description{}),
+                              boost::program_options::value(&*detail::get<Ts>(tmp))));
+        p.parse_command_line(argc, argv);
 
-        if (vm.count("help"))
-            Actions{}.help(desc);
+        if (p.has("help"))
+            Actions{}.help(p);
 #ifdef RACONFIG_VERSION_STRING
-        if (vm.count("version"))
+        if (p.has("version"))
             Actions{}.version(RACONFIG_VERSION_STRING);
 #endif
-        auto const& config_value = vm["config"];
-        if (!config_value.empty())
-            parse_file_impl(config_value.as<std::string>().c_str(), tmp);
+        std::string config;
+        if (p.get("config", config)) {
+            detail::options_parser p;
+            RACONFIG_FOLD(!detail::get<Ts>(tmp)(detail::cfg_name{}) ? (void)0
+                          : p.add(detail::get<Ts>(tmp)(detail::cfg_name{}),
+                                  detail::get<Ts>(tmp)(detail::description{}),
+                                  boost::program_options::value(&*detail::get<Ts>(tmp))));
+            p.parse_config_file(config.c_str());
+            p.notify();
+        }
 
         // notify command line options after config
-        detail::po::notify(vm);
+        p.notify();
         RACONFIG_FOLD(detail::get<Ts>(tmp)(detail::transform_backend{}));
         RACONFIG_FOLD(detail::get<Ts>(tmp)(detail::check_value{}));
         options_ = std::move(tmp);
-
-        if (vm.count("show-config")) {
+        if (p.has("show-config")) {
             Actions actions;
             actions.show_config_begin();
             RACONFIG_FOLD(detail::show_option(actions, detail::get<Ts>(options_)));
             actions.show_config_end();
         }
-    }
-
-    void parse_file_impl(const char *path, std::tuple<Ts...>& tmp)
-    {
-        detail::po::options_description desc;
-        auto options = desc.add_options();
-        RACONFIG_FOLD(detail::init_option(options, detail::get<Ts>(tmp), detail::cfg_name{}));
-        detail::po::variables_map vm;
-        detail::parse_config_file(path, desc, vm);
-        detail::po::notify(vm);
     }
 
     std::tuple<Ts...> options_;

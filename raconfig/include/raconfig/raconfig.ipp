@@ -17,6 +17,8 @@
 #ifndef RACONFIG_IPP
 #define RACONFIG_IPP
 
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/variables_map.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <iostream>
 
@@ -37,19 +39,73 @@ RACONFIG_INLINE config_error::config_error(const char* what)
 
 namespace detail
 {
+namespace po = boost::program_options;
 
-RACONFIG_INLINE void parse_command_line(int argc, const char* const argv[],
-        po::options_description const& desc,
-        po::variables_map& vm)
+struct options_parser::impl
 {
-    po::store(po::parse_command_line(argc, argv, desc), vm);
+    impl(const char *header)
+        : desc{header}
+        , init{&desc}
+    {}
+
+    po::options_description desc;
+    po::options_description_easy_init init;
+    po::variables_map vm;
+};
+
+RACONFIG_INLINE options_parser::options_parser(const char *header)
+{
+    impl_ = new impl{header};
 }
 
-RACONFIG_INLINE void parse_config_file(const char *path,
-        po::options_description const& desc,
-        po::variables_map& vm)
+RACONFIG_INLINE void options_parser::add(const char *name, const char *description, po::value_semantic const *s)
 {
-    po::store(po::parse_config_file<char>(path, desc, false), vm);
+    if (s == nullptr)
+        impl_->init(name, description);
+    else
+        impl_->init(name, s, description);
+}
+
+RACONFIG_INLINE void options_parser::parse_command_line(int argc, const char* const argv[])
+{
+    impl_->vm.clear();
+    po::store(po::parse_command_line(argc, argv, impl_->desc), impl_->vm);
+}
+
+RACONFIG_INLINE void options_parser::parse_config_file(const char *path)
+{
+    impl_->vm.clear();
+    po::store(po::parse_config_file<char>(path, impl_->desc, false), impl_->vm);
+}
+
+RACONFIG_INLINE void options_parser::notify()
+{
+    po::notify(impl_->vm);
+}
+
+RACONFIG_INLINE bool options_parser::has(const char *name) const
+{
+    return impl_->vm.count(name) > 0;
+}
+
+RACONFIG_INLINE bool options_parser::get(const char *name, std::string& value) const
+{
+    po::variable_value const& vv = impl_->vm[name];
+    if (!vv.empty()) {
+        value = vv.as<std::string>();
+        return true;
+    }
+    return false;
+}
+
+RACONFIG_INLINE options_parser::operator po::options_description const& () const noexcept
+{
+    return impl_->desc;
+}
+
+RACONFIG_INLINE options_parser::~options_parser()
+{
+    delete impl_;
 }
 
 RACONFIG_INLINE void throw_option_check_failed(const char *name, const char *value)
@@ -62,7 +118,7 @@ RACONFIG_INLINE void throw_option_check_failed(const char *name, const char *val
 
 } // namespace detail
 
-RACONFIG_INLINE void default_actions::help(detail::po::options_description const& desc)
+RACONFIG_INLINE void default_actions::help(boost::program_options::options_description const& desc)
 {
     std::cout << desc << '\n';
     std::exit(EXIT_SUCCESS);

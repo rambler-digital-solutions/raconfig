@@ -18,6 +18,8 @@
 #define BOOST_TEST_MODULE raconfig
 #include <boost/test/unit_test.hpp>
 
+#include <boost/program_options/options_description.hpp>
+
 #define RACONFIG_VERSION_STRING "version test"
 #include <raconfig/raconfig.hpp>
 #include <raconfig/raconfig_set.hpp>
