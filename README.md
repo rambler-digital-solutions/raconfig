@@ -1,6 +1,7 @@
 # Declarative configuration wrapper on Boost.Program Options
 
 [![Build Status](https://travis-ci.org/rambler-digital-solutions/raconfig.svg?branch=master)](https://travis-ci.org/rambler-digital-solutions/raconfig)
+[![Try online](https://img.shields.io/badge/Try-online-4DB6AC.svg)](https://wandbox.org/permlink/McOPim9J3FFnEwZi)
 
 ## Motivation
 
