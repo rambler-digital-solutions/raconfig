@@ -17,6 +17,12 @@
 #ifndef RACONFIG_RANGE_HPP
 #define RACONFIG_RANGE_HPP
 
+namespace boost { namespace program_options {
+
+class options_description;
+
+}}
+
 namespace raconfig
 {
 

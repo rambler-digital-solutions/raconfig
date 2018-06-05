@@ -15,6 +15,7 @@
 //
 
 #include "config.hpp"
+#include <boost/program_options/options_description.hpp>
 #include <iostream>
 
 std::istream& operator >> (std::istream& is, color& c)
